@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3CX Server Monitor — Command Central</title>
+  <style>
+    :root {
+      --bg: #f0f2f5; --card: #fff; --border: #e0e4ea;
+      --text: #1a1a2e; --muted: #6b7280; --nav: #1a1a2e;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+           background: var(--bg); color: var(--text); font-size: 14px; }
+
+    /* ── Header ─────────────────────────────────────────────────── */
+    header {
+      background: var(--nav); color: #fff; padding: 0 24px; height: 56px;
+      display: flex; align-items: center; gap: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.25); position: sticky; top: 0; z-index: 10;
+    }
+    .back-link { color: rgba(255,255,255,.65); text-decoration: none; font-size: .82rem; white-space: nowrap; }
+    .back-link:hover { color: #fff; }
+    .divider { width: 1px; height: 20px; background: rgba(255,255,255,.2); flex-shrink: 0; }
+    header h1 { font-size: 1rem; font-weight: 700; }
+    header p  { font-size: .72rem; opacity: .6; margin-top: 1px; }
+    .header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+    .refresh-info { font-size: .72rem; color: rgba(255,255,255,.45); }
+    .btn { border: none; cursor: pointer; font-family: inherit; font-weight: 600; border-radius: 6px; transition: background .15s; }
+    .btn-sm { font-size: .78rem; padding: 5px 14px; background: rgba(255,255,255,.12); color: #fff; }
+    .btn-sm:hover { background: rgba(255,255,255,.22); }
+
+    /* ── Layout ─────────────────────────────────────────────────── */
+    main { max-width: 1080px; margin: 32px auto; padding: 0 24px; display: flex; flex-direction: column; gap: 20px; }
+
+    /* ── Status banner ──────────────────────────────────────────── */
+    .status-banner {
+      border-radius: 12px; padding: 18px 24px;
+      display: flex; align-items: center; gap: 16px;
+    }
+    .status-banner--ok       { background: #d1fae5; border: 1px solid #6ee7b7; }
+    .status-banner--warning  { background: #fef3c7; border: 1px solid #fcd34d; }
+    .status-banner--critical { background: #fee2e2; border: 1px solid #fca5a5; }
+    .status-banner--unknown  { background: #f3f4f6; border: 1px solid #d1d5db; }
+
+    .status-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+    .status-dot--ok       { background: #10b981; }
+    .status-dot--warning  { background: #f59e0b; }
+    .status-dot--critical { background: #ef4444; animation: pulse .9s ease-in-out infinite alternate; }
+    .status-dot--unknown  { background: #9ca3af; }
+    @keyframes pulse { from { box-shadow: 0 0 0 0 rgba(239,68,68,.5); } to { box-shadow: 0 0 0 8px rgba(239,68,68,0); } }
+
+    .status-main  { font-size: 1.1rem; font-weight: 700; }
+    .status-main--ok       { color: #065f46; }
+    .status-main--warning  { color: #92400e; }
+    .status-main--critical { color: #991b1b; }
+    .status-main--unknown  { color: #374151; }
+    .status-sub { font-size: .82rem; color: var(--muted); margin-top: 3px; }
+
+    /* ── Card ───────────────────────────────────────────────────── */
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.06); padding: 18px 20px; }
+    .card-title { font-size: .68rem; font-weight: 700; text-transform: uppercase;
+                  letter-spacing: .08em; color: var(--muted); margin-bottom: 14px; }
+
+    /* ── Grids ──────────────────────────────────────────────────── */
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+    @media (max-width: 720px) { .grid-3, .grid-2 { grid-template-columns: 1fr; } }
+
+    /* ── Stat item ──────────────────────────────────────────────── */
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
+    .stat-value { font-size: .95rem; font-weight: 700; margin-bottom: 2px; }
+    .stat-label { font-size: .72rem; color: var(--muted); }
+
+    /* ── Progress bar ───────────────────────────────────────────── */
+    .progress-wrap { }
+    .progress-header { display: flex; justify-content: space-between; margin-bottom: 6px; }
+    .progress-bar { height: 7px; background: #e5e7eb; border-radius: 4px; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 4px; transition: width .4s; }
+    .progress-fill--ok   { background: #10b981; }
+    .progress-fill--warn { background: #f59e0b; }
+    .progress-fill--crit { background: #ef4444; }
+    .progress-label { font-size: .82rem; }
+    .progress-pct { font-size: .82rem; font-weight: 700; }
+
+    /* ── Services ───────────────────────────────────────────────── */
+    .services-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 7px; }
+    .svc-row { display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+               border-radius: 7px; background: #f9fafb; border: 1px solid transparent; }
+    .svc-row--down { background: #fef2f2; border-color: #fecaca; }
+    .svc-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .svc-dot--up   { background: #10b981; }
+    .svc-dot--down { background: #ef4444; }
+    .svc-name  { font-size: .78rem; font-family: monospace; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .svc-state { font-size: .72rem; color: var(--muted); }
+    .svc-state--down { color: #dc2626; font-weight: 700; }
+
+    /* ── Kernel issues ──────────────────────────────────────────── */
+    .kernel-ok { color: #065f46; font-size: .85rem; display: flex; align-items: center; gap: 6px; }
+    .issue-list { list-style: none; display: flex; flex-direction: column; gap: 5px; }
+    .issue-list li { background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px;
+                     padding: 6px 10px; font-family: monospace; font-size: .73rem;
+                     color: #991b1b; word-break: break-all; line-height: 1.5; }
+
+    /* ── Boot history / alerts table ────────────────────────────── */
+    table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+    th { text-align: left; padding: 6px 10px; font-size: .68rem; text-transform: uppercase;
+         letter-spacing: .06em; color: var(--muted); border-bottom: 1px solid var(--border); }
+    td { padding: 7px 10px; border-bottom: 1px solid #f3f4f6; vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: .68rem; font-weight: 700; }
+    .badge--current { background: #dbeafe; color: #1d4ed8; }
+    .badge--short   { background: #fee2e2; color: #dc2626; }
+
+    /* ── Alert log ──────────────────────────────────────────────── */
+    .alert-log { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+    .alert-log li { font-family: monospace; font-size: .72rem; padding: 5px 8px;
+                    background: #f9fafb; border-radius: 4px; word-break: break-all;
+                    line-height: 1.5; color: var(--text); }
+  </style>
+</head>
+<body>
+
+<header>
+  <a class="back-link" href="/">← Command Central</a>
+  <div class="divider"></div>
+  <div>
+    <h1>3CX Server Monitor</h1>
+    <p id="header-sub">Loading…</p>
+  </div>
+  <div class="header-right">
+    <span class="refresh-info" id="refresh-info"></span>
+    <button class="btn btn-sm" onclick="loadStats()">Refresh</button>
+  </div>
+</header>
+
+<main>
+  <div id="status-banner" class="status-banner status-banner--unknown">
+    <div id="status-dot" class="status-dot status-dot--unknown"></div>
+    <div>
+      <div id="status-main" class="status-main status-main--unknown">Loading…</div>
+      <div id="status-sub" class="status-sub"></div>
+    </div>
+  </div>
+
+  <div class="grid-3" id="info-row">
+    <div class="card"><div class="card-title">System</div><div id="sys-card"><span style="color:var(--muted)">…</span></div></div>
+    <div class="card"><div class="card-title">Load Average</div><div id="load-card"><span style="color:var(--muted)">…</span></div></div>
+    <div class="card"><div class="card-title">Snapshot</div><div id="snap-card"><span style="color:var(--muted)">…</span></div></div>
+  </div>
+
+  <div class="grid-3" id="res-row">
+    <div class="card"><div class="card-title">CPU</div><div id="cpu-card"><span style="color:var(--muted)">…</span></div></div>
+    <div class="card"><div class="card-title">Memory</div><div id="mem-card"><span style="color:var(--muted)">…</span></div></div>
+    <div class="card"><div class="card-title">Disk (/)</div><div id="disk-card"><span style="color:var(--muted)">…</span></div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Services</div>
+    <div id="services-content"><span style="color:var(--muted)">Loading…</span></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Kernel Issues</div>
+    <div id="kernel-content"><span style="color:var(--muted)">Loading…</span></div>
+  </div>
+
+  <div class="grid-2" id="bottom-row">
+    <div class="card">
+      <div class="card-title">Boot History</div>
+      <div id="boot-content"><span style="color:var(--muted)">Loading…</span></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Recent Alerts</div>
+      <div id="alerts-content"><span style="color:var(--muted)">Loading…</span></div>
+    </div>
+  </div>
+
+  <div style="height:24px"></div>
+</main>
+
+<script>
+  const STATUS_LABELS = { ok: "All Systems OK", warning: "Warning", critical: "Critical Alert" };
+  const STATUS_SUB_DEFAULT = { ok: "No issues detected", warning: "", critical: "" };
+
+  function sc(status) {
+    return ["ok","warning","critical"].includes(status) ? status : "unknown";
+  }
+
+  function barClass(pct) {
+    return pct >= 85 ? "crit" : pct >= 70 ? "warn" : "ok";
+  }
+
+  function fmtDT(iso) {
+    if (!iso) return "—";
+    return new Date(iso).toLocaleString("da-DK", { dateStyle: "short", timeStyle: "short" });
+  }
+
+  function progressBar(pct, label, detail) {
+    const cls = barClass(pct);
+    const color = cls === "crit" ? "#ef4444" : "inherit";
+    return `
+      <div class="progress-wrap">
+        <div class="progress-header">
+          <span class="progress-label">${detail}</span>
+          <span class="progress-pct" style="color:${color}">${pct.toFixed(1)}%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill progress-fill--${cls}" style="width:${Math.min(pct,100)}%"></div>
+        </div>
+      </div>`;
+  }
+
+  function render(data) {
+    const s = sc(data.overall_status);
+
+    // ── Status banner ─────────────────────────────────────────────────────────
+    document.getElementById("status-banner").className = `status-banner status-banner--${s}`;
+    document.getElementById("status-dot").className    = `status-dot status-dot--${s}`;
+    const mainEl = document.getElementById("status-main");
+    mainEl.className  = `status-main status-main--${s}`;
+    mainEl.textContent = STATUS_LABELS[s] || s;
+
+    const subs = [];
+    if ((data.kernel_issues_count || 0) > 0)
+      subs.push(`${data.kernel_issues_count} kernel issue${data.kernel_issues_count > 1 ? "s" : ""}`);
+    if (data.services_all_ok === false) {
+      const down = Object.entries(data.services || {}).filter(([,v]) => v !== "active");
+      subs.push(`${down.length} service${down.length > 1 ? "s" : ""} down`);
+    }
+    if (data.memory?.swap_used_mb > 0) subs.push(`Swap in use: ${data.memory.swap_used_mb} MB`);
+    document.getElementById("status-sub").textContent = subs.join(" · ") || STATUS_SUB_DEFAULT[s] || "";
+    document.getElementById("header-sub").textContent = data.hostname || "";
+
+    // ── System info ───────────────────────────────────────────────────────────
+    const sys = data.system || {};
+    document.getElementById("sys-card").innerHTML = `
+      <div class="stat-grid">
+        <div><div class="stat-value">${sys.uptime_human || "—"}</div><div class="stat-label">Uptime</div></div>
+        <div><div class="stat-value">${sys.vcpus ?? "—"}</div><div class="stat-label">vCPUs</div></div>
+        <div><div class="stat-value" style="font-size:.82rem">${fmtDT(sys.boot_time)}</div><div class="stat-label">Last Boot</div></div>
+      </div>`;
+
+    const loadColor = sys.load_1m > (sys.vcpus || 4) ? "#ef4444" : "inherit";
+    document.getElementById("load-card").innerHTML = `
+      <div class="stat-grid">
+        <div><div class="stat-value" style="color:${loadColor}">${sys.load_1m?.toFixed(2) ?? "—"}</div><div class="stat-label">1 min</div></div>
+        <div><div class="stat-value">${sys.load_5m?.toFixed(2) ?? "—"}</div><div class="stat-label">5 min</div></div>
+        <div><div class="stat-value">${sys.load_15m?.toFixed(2) ?? "—"}</div><div class="stat-label">15 min</div></div>
+      </div>`;
+
+    document.getElementById("snap-card").innerHTML = `
+      <div class="stat-grid">
+        <div style="grid-column:1/-1">
+          <div class="stat-value" style="font-size:.85rem">${data.timestamp ? new Date(data.timestamp).toLocaleString("da-DK") : "—"}</div>
+          <div class="stat-label">API Timestamp</div>
+        </div>
+      </div>`;
+
+    // ── Resources ─────────────────────────────────────────────────────────────
+    const cpu  = data.cpu    || {};
+    const mem  = data.memory || {};
+    const disk = (data.disk  || {})["/"] || {};
+
+    const cpuBusy = 100 - (cpu.idle_pct ?? 100);
+    document.getElementById("cpu-card").innerHTML = progressBar(
+      cpuBusy,
+      "CPU",
+      `User ${cpu.user_pct?.toFixed(1) ?? "?"}% · Sys ${cpu.sys_pct?.toFixed(1) ?? "?"}% · IOWait ${cpu.iowait_pct?.toFixed(1) ?? "?"}%`
+    );
+
+    const memDetail = `${mem.used_mb ? (mem.used_mb/1024).toFixed(1)+"GB" : "?"} / ${mem.total_mb ? (mem.total_mb/1024).toFixed(1)+"GB" : "?"}${mem.swap_used_mb > 0 ? " · Swap!" : ""}`;
+    document.getElementById("mem-card").innerHTML = progressBar(mem.used_pct ?? 0, "Memory", memDetail);
+
+    const diskDetail = disk.free_mb ? `${(disk.free_mb/1024).toFixed(1)} GB free` : "—";
+    document.getElementById("disk-card").innerHTML = progressBar(disk.used_pct ?? 0, "Disk", diskDetail);
+
+    // ── Services ──────────────────────────────────────────────────────────────
+    const svcs = Object.entries(data.services || {}).sort(([a],[b]) => a.localeCompare(b));
+    document.getElementById("services-content").innerHTML = svcs.length
+      ? `<div class="services-grid">${svcs.map(([name, state]) => {
+          const up = state === "active";
+          return `<div class="svc-row${up ? "" : " svc-row--down"}">
+            <div class="svc-dot svc-dot--${up ? "up" : "down"}"></div>
+            <span class="svc-name" title="${name}">${name}</span>
+            <span class="svc-state${up ? "" : " svc-state--down"}">${state}</span>
+          </div>`;
+        }).join("")}</div>`
+      : '<span style="color:var(--muted);font-size:.85rem">No service data.</span>';
+
+    // ── Kernel issues ─────────────────────────────────────────────────────────
+    const issues = data.kernel_issues || [];
+    document.getElementById("kernel-content").innerHTML = issues.length
+      ? `<ul class="issue-list">${issues.map(i => `<li>${i.replace(/</g,"&lt;")}</li>`).join("")}</ul>`
+      : `<span class="kernel-ok"><span style="color:#10b981;font-size:1rem">✓</span> No kernel issues in current boot.</span>`;
+
+    // ── Boot history ──────────────────────────────────────────────────────────
+    const boots = (data.boot_history || []).slice(0, 5);
+    document.getElementById("boot-content").innerHTML = boots.length
+      ? `<table>
+          <thead><tr><th>#</th><th>Started</th><th>Ended</th><th>Duration</th></tr></thead>
+          <tbody>${boots.map(b => {
+            const durSec = b.last && b.first ? (new Date(b.last) - new Date(b.first)) / 1000 : null;
+            const isShort = durSec !== null && durSec < 3600;
+            const dur = durSec === null ? '<span class="badge badge--current">current</span>'
+                      : isShort ? `<span class="badge badge--short">${Math.round(durSec/60)}m — short!</span>`
+                      : `${(durSec/3600).toFixed(1)}h`;
+            return `<tr>
+              <td>${b.idx === 0 ? '<span class="badge badge--current">now</span>' : b.idx}</td>
+              <td>${fmtDT(b.first)}</td>
+              <td>${b.idx === 0 ? "—" : fmtDT(b.last)}</td>
+              <td>${dur}</td>
+            </tr>`;
+          }).join("")}</tbody>
+        </table>`
+      : '<span style="color:var(--muted);font-size:.85rem">No boot history.</span>';
+
+    // ── Alerts ────────────────────────────────────────────────────────────────
+    const alerts = data.alerts || [];
+    document.getElementById("alerts-content").innerHTML = alerts.length
+      ? `<ul class="alert-log">${alerts.map(a => `<li>${a.replace(/</g,"&lt;")}</li>`).join("")}</ul>`
+      : '<span style="color:var(--muted);font-size:.85rem">No recent alerts.</span>';
+  }
+
+  function renderError(msg) {
+    const b = document.getElementById("status-banner");
+    b.className = "status-banner status-banner--unknown";
+    document.getElementById("status-dot").className = "status-dot status-dot--unknown";
+    const m = document.getElementById("status-main");
+    m.className = "status-main status-main--unknown";
+    m.textContent = "Unreachable";
+    document.getElementById("status-sub").textContent = msg;
+    document.getElementById("header-sub").textContent = "192.168.1.7";
+  }
+
+  function loadStats() {
+    const info = document.getElementById("refresh-info");
+    info.textContent = "Refreshing…";
+    fetch("/syshealth/api/stats")
+      .then(r => r.json())
+      .then(data => {
+        if (data.error && !data.overall_status) { renderError(data.error); }
+        else { render(data); }
+        info.textContent = "Updated " + new Date().toLocaleTimeString("da-DK");
+      })
+      .catch(e => {
+        renderError("Network error: " + e.message);
+        info.textContent = "Failed";
+      });
+  }
+
+  loadStats();
+  setInterval(loadStats, 30000);
+</script>
+</body>
+</html>
