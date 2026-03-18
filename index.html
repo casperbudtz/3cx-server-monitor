@@ -74,7 +74,7 @@
     .stat-label { font-size: .72rem; color: var(--muted); }
 
     /* ── Progress bar ───────────────────────────────────────────── */
-    .progress-wrap { }
+    /* .progress-wrap { } */
     .progress-header { display: flex; justify-content: space-between; margin-bottom: 6px; }
     .progress-bar { height: 7px; background: #e5e7eb; border-radius: 4px; overflow: hidden; }
     .progress-fill { height: 100%; border-radius: 4px; transition: width .4s; }
@@ -112,7 +112,6 @@
 
     .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: .68rem; font-weight: 700; }
     .badge--current { background: #dbeafe; color: #1d4ed8; }
-    .badge--short   { background: #fee2e2; color: #dc2626; }
 
     /* ── Alert log ──────────────────────────────────────────────── */
     .alert-log { list-style: none; display: flex; flex-direction: column; gap: 4px; }
@@ -162,15 +161,16 @@
     <div id="services-content"><span style="color:var(--muted)">Loading…</span></div>
   </div>
 
+  <!-- Boot history now gets full width; kernel issues and alerts sit side-by-side below -->
   <div class="card">
-    <div class="card-title">Kernel Issues</div>
-    <div id="kernel-content"><span style="color:var(--muted)">Loading…</span></div>
+    <div class="card-title">Boot History</div>
+    <div id="boot-content"><span style="color:var(--muted)">Loading…</span></div>
   </div>
 
   <div class="grid-2" id="bottom-row">
     <div class="card">
-      <div class="card-title">Boot History</div>
-      <div id="boot-content"><span style="color:var(--muted)">Loading…</span></div>
+      <div class="card-title">Kernel Issues</div>
+      <div id="kernel-content"><span style="color:var(--muted)">Loading…</span></div>
     </div>
     <div class="card">
       <div class="card-title">Recent Alerts</div>
@@ -184,6 +184,21 @@
 <script>
   const STATUS_LABELS = { ok: "All Systems OK", warning: "Warning", critical: "Critical Alert" };
   const STATUS_SUB_DEFAULT = { ok: "No issues detected", warning: "", critical: "" };
+
+  function endTypeSpan(type) {
+    const map = { crash: ['#ef4444','crash'], halt: ['#f59e0b','halt'], reboot: ['#3b82f6','reboot'], current: ['#10b981','current'], unknown: ['#9ca3af','unknown'] };
+    const t = map[type] || map.unknown;
+    return `<span class="badge" style="background:${t[0]};color:#fff">${t[1]}</span>`;
+  }
+
+  function fmtGap(sec) {
+    if (sec === null || sec === undefined) return '—';
+    if (sec < 0) return `${Math.abs(Math.round(sec/60))}m (overlap)`;
+    if (sec < 60) return `${sec}s`;
+    if (sec < 3600) return `${Math.round(sec/60)}m`;
+    if (sec < 3600*24) return `${(sec/3600).toFixed(1)}h`;
+    return `${Math.round(sec/3600/24)}d`;
+  }
 
   function sc(status) {
     return ["ok","warning","critical"].includes(status) ? status : "unknown";
@@ -297,21 +312,25 @@
       : `<span class="kernel-ok"><span style="color:#10b981;font-size:1rem">✓</span> No kernel issues in current boot.</span>`;
 
     // ── Boot history ──────────────────────────────────────────────────────────
-    const boots = (data.boot_history || []).slice(0, 5);
+    const boots = (data.boot_history || []).slice(0, 10);
     document.getElementById("boot-content").innerHTML = boots.length
       ? `<table>
-          <thead><tr><th>#</th><th>Started</th><th>Ended</th><th>Duration</th></tr></thead>
+          <thead><tr><th>#</th><th>Started</th><th>Ended</th><th>Duration</th><th>End Type</th><th>Gap</th><th>Clean?</th></tr></thead>
           <tbody>${boots.map(b => {
-            const durSec = b.last && b.first ? (new Date(b.last) - new Date(b.first)) / 1000 : null;
-            const isShort = durSec !== null && durSec < 3600;
-            const dur = durSec === null ? '<span class="badge badge--current">current</span>'
-                      : isShort ? `<span class="badge badge--short">${Math.round(durSec/60)}m — short!</span>`
-                      : `${(durSec/3600).toFixed(1)}h`;
+            const dur = b.duration_human || fmtGap(b.duration_seconds);
+            const endType = endTypeSpan(b.end_type || (b.idx===0 ? 'current' : 'unknown'));
+            const gap = fmtGap(b.gap_to_next_seconds);
+            const clean = b.clean_shutdown === true ? 'Yes' : b.clean_shutdown === false ? 'No' : '—';
+            const idxCell = b.idx === 0 ? '<span class="badge badge--current">now</span>' : b.idx;
+            const ended = b.idx === 0 ? '—' : fmtDT(b.last);
             return `<tr>
-              <td>${b.idx === 0 ? '<span class="badge badge--current">now</span>' : b.idx}</td>
+              <td>${idxCell}</td>
               <td>${fmtDT(b.first)}</td>
-              <td>${b.idx === 0 ? "—" : fmtDT(b.last)}</td>
+              <td>${ended}</td>
               <td>${dur}</td>
+              <td>${endType}</td>
+              <td>${gap}</td>
+              <td>${clean}</td>
             </tr>`;
           }).join("")}</tbody>
         </table>`

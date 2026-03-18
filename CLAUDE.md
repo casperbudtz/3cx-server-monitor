@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Health monitor for the 3CX PBX server — a Debian 12 virtual machine (Hyper-V, 4 vCPUs, 4 GB RAM) running the 3CX phone system. The server crashed twice on 2026-03-12 due to RCU preempt kthread starvation caused by Hyper-V timer interrupt delivery issues. This module exists to confirm stability after the fix (vCPU upgrade) and catch any recurrence early.
+Health monitor for the 3CX PBX server — a Debian 12 virtual machine (Hyper-V, 4 vCPUs, 4 GB RAM) running the 3CX phone system. The server crashed 4+ times due to a Hyper-V NO_HZ timer bug (RCU preempt kthread starvation). Fix applied 2026-03-18: `nohz=off` kernel boot parameter. This module exists to confirm stability and catch any recurrence early.
 
 Files:
 - `index.html` — browser dashboard; served at `/syshealth/` by the top-level server. Auto-refreshes every 30s. Shows status banner, services grid, kernel issues, boot history, resource bars (CPU/memory/disk).
@@ -45,7 +45,7 @@ Key fields:
 | `kernel_issues` | list of raw kernel log lines matching RCU stall / OOM / BUG patterns |
 | `kernel_issues_count` | length of `kernel_issues` (0 = clean) |
 | `system.vcpus` | should be 4 after the fix |
-| `boot_history` | last 5 boots; short previous boots (< 1 hour) indicate instability |
+| `boot_history` | up to 10 boots, oldest-first; key fields: `end_type`, `duration_seconds`, `duration_human`, `gap_to_next_seconds`, `clean_shutdown` |
 | `memory.swap_used_mb` | should be 0; non-zero = RAM pressure |
 
 ## Network
@@ -94,6 +94,6 @@ crontab -e
 | `overall_status = "critical"` | Service down or kernel issue — phone system may be impaired |
 | `kernel_issues` contains "rcu.*stall" or "RCU.*starved" | Same issue that caused the crashes — escalate |
 | `system.vcpus < 4` | vCPU count dropped — Hyper-V config change |
-| `boot_history[-1].duration < 1h` | Previous boot was very short — likely a crash |
+| `boot_history[-2].end_type = "crash"` | Previous boot crashed (array is oldest-first; -1 = current, -2 = previous) |
 | `memory.swap_used_mb > 0` | RAM pressure |
 | API unreachable | Server may be down / crashed |

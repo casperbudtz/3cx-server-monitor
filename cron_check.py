@@ -91,6 +91,12 @@ def _issues_summary(data):
     vcpus = sys_info.get("vcpus", 4)
     if data.get("system", {}).get("load_1m", 0) > vcpus:
         parts.append(f"Load {data['system']['load_1m']:.1f} > {vcpus} vCPUs")
+    boot_history = data.get("boot_history") or []
+    if len(boot_history) > 1:
+        prev = boot_history[-2]  # previous boot (oldest-first array)
+        if prev.get("end_type") == "crash":
+            dur = prev.get("duration_human") or ""
+            parts.append(f"previous boot crashed ({dur})".strip())
     return parts
 
 
@@ -134,18 +140,24 @@ def _send_alert_email(email_cfg, data, status):
                 text_lines.append(f"  {line}")
             text_lines.append("")
 
-        # Boot history — flag short/recent boots
+        # Boot history — flag crashes or suspiciously short previous boots
         boot_history = data.get("boot_history") or []
         if len(boot_history) > 1:
-            prev = boot_history[1]  # index -1 = previous boot
-            if prev.get("first") and prev.get("last"):
-                dur_sec = (datetime.fromisoformat(prev["last"]) -
-                           datetime.fromisoformat(prev["first"])).total_seconds()
-                if dur_sec < 3600:
-                    text_lines.append(
-                        f"Previous boot was only {int(dur_sec//60)} minutes long "
-                        f"(started {prev['first']}, ended {prev['last']}) — possible crash.\n"
-                    )
+            prev = boot_history[-2]  # previous boot (array is oldest-first; -1 = current)
+            end_type = prev.get("end_type", "unknown")
+            dur_human = prev.get("duration_human") or f"{int((prev.get('duration_seconds') or 0) // 60)}m"
+            if end_type == "crash":
+                gap_sec = prev.get("gap_to_next_seconds")
+                gap_note = f", gap to next boot: {int(gap_sec // 60)}m" if gap_sec is not None else ""
+                text_lines.append(
+                    f"Previous boot ended in a CRASH (duration: {dur_human}, "
+                    f"started {prev.get('first','?')}, ended {prev.get('last','?')}{gap_note}).\n"
+                )
+            elif end_type not in ("reboot", "halt", "current") and (prev.get("duration_seconds") or 0) < 3600:
+                text_lines.append(
+                    f"Previous boot was short: {dur_human} "
+                    f"(started {prev.get('first','?')}, ended {prev.get('last','?')}) — possible crash.\n"
+                )
 
         # Memory / load summary
         mem = data.get("memory") or {}
