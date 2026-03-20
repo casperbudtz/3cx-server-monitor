@@ -216,12 +216,13 @@ def _send_alert_email(email_cfg, data, status):
     uptime   = sys_info.get("uptime_human", "?")
     load_color = "#dc2626" if isinstance(load_1m, (int, float)) and isinstance(vcpus, int) and load_1m > vcpus else "#1a1a2e"
     mem_color  = "#dc2626" if mem_pct > 85 else "#1a1a2e"
+    load_str   = f"{load_1m:.2g}" if isinstance(load_1m, (int, float)) else str(load_1m)
 
     stats_row = "" if data is None else f"""
       <div style="display:flex;gap:24px;flex-wrap:wrap;padding:12px 16px;
                   background:#f8f9fa;border-top:1px solid #e0e4ea;font-size:.8rem;color:#6b7280">
         <span>vCPUs: <strong style="color:#1a1a2e">{vcpus}</strong></span>
-        <span>Load: <strong style="color:{load_color}">{load_1m:.2g if isinstance(load_1m, float) else load_1m}</strong></span>
+        <span>Load: <strong style="color:{load_color}">{load_str}</strong></span>
         <span>Memory: <strong style="color:{mem_color}">{mem_pct:.1f}%</strong></span>
         <span>Swap: <strong style="color:{'#dc2626' if mem.get('swap_used_mb',0)>0 else '#1a1a2e'}">{mem.get('swap_used_mb',0)} MB</strong></span>
         <span>Uptime: <strong style="color:#1a1a2e">{uptime}</strong></span>
