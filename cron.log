@@ -1,2 +1,16 @@
 [2026-03-13 07:00:01] OK     status=ok hostname=3cxserver uptime=up 19h 40m
 [2026-03-13 07:00:01] NOTIFY  No email needed (status=ok, last=ok)
+[2026-03-14 07:00:01] OK     status=ok hostname=3cxserver uptime=up 43h 40m
+[2026-03-14 07:00:01] NOTIFY  No email needed (status=ok, last=ok)
+[2026-03-15 07:00:01] OK     status=ok hostname=3cxserver uptime=up 67h 40m
+[2026-03-15 07:00:01] NOTIFY  No email needed (status=ok, last=ok)
+[2026-03-16 07:00:01] OK     status=ok hostname=3cxserver uptime=up 91h 40m
+[2026-03-16 07:00:01] NOTIFY  No email needed (status=ok, last=ok)
+[2026-03-17 07:00:01] OK     status=ok hostname=3cxserver uptime=up 115h 40m
+[2026-03-17 07:00:01] NOTIFY  No email needed (status=ok, last=ok)
+[2026-03-18 07:00:01] ERROR  API unreachable: timed out
+[2026-03-18 07:00:01] NOTIFY  Alert email sent (status=unreachable)
+[2026-03-19 07:00:01] NOTIFY  Failed to send alert: Invalid format specifier '.2g if isinstance(load_1m, float) else load_1m' for object of type 'float'
+[2026-03-19 07:00:01] OK     status=critical hostname=3cxserver uptime=up 21h 19m | issues: 4 kernel issue(s); Swap in use: 538 MB
+[2026-03-20 07:00:01] OK     status=ok hostname=3cxserver uptime=up 2h 12m
+[2026-03-20 07:00:01] NOTIFY  Resolved email sent

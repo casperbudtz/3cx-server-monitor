@@ -102,6 +102,13 @@
     .issue-list li { background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px;
                      padding: 6px 10px; font-family: monospace; font-size: .73rem;
                      color: #991b1b; word-break: break-all; line-height: 1.5; }
+    .kernel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .kernel-header .card-title { margin-bottom: 0; }
+    .btn-dismiss { font-size: .72rem; padding: 4px 12px; background: #fef2f2; color: #991b1b;
+                   border: 1px solid #fecaca; border-radius: 5px; cursor: pointer;
+                   font-family: inherit; font-weight: 600; transition: background .15s; }
+    .btn-dismiss:hover { background: #fee2e2; }
+    .btn-dismiss:disabled { opacity: .5; cursor: default; }
 
     /* ── Boot history / alerts table ────────────────────────────── */
     table { width: 100%; border-collapse: collapse; font-size: .82rem; }
@@ -169,7 +176,10 @@
 
   <div class="grid-2" id="bottom-row">
     <div class="card">
-      <div class="card-title">Kernel Issues</div>
+      <div class="kernel-header">
+        <div class="card-title">Kernel Issues</div>
+        <button class="btn-dismiss" id="dismiss-btn" onclick="acknowledgeKernelIssues()" style="display:none">Dismiss all</button>
+      </div>
       <div id="kernel-content"><span style="color:var(--muted)">Loading…</span></div>
     </div>
     <div class="card">
@@ -307,6 +317,9 @@
 
     // ── Kernel issues ─────────────────────────────────────────────────────────
     const issues = data.kernel_issues || [];
+    const dismissBtn = document.getElementById("dismiss-btn");
+    dismissBtn.style.display = issues.length ? "" : "none";
+    dismissBtn.disabled = false;
     document.getElementById("kernel-content").innerHTML = issues.length
       ? `<ul class="issue-list">${issues.map(i => `<li>${i.replace(/</g,"&lt;")}</li>`).join("")}</ul>`
       : `<span class="kernel-ok"><span style="color:#10b981;font-size:1rem">✓</span> No kernel issues in current boot.</span>`;
@@ -317,7 +330,7 @@
       ? `<table>
           <thead><tr><th>#</th><th>Started</th><th>Ended</th><th>Duration</th><th>End Type</th><th>Gap</th><th>Clean?</th></tr></thead>
           <tbody>${boots.map(b => {
-            const dur = b.duration_human || fmtGap(b.duration_seconds);
+            const dur = fmtGap(b.duration_seconds);
             const endType = endTypeSpan(b.end_type || (b.idx===0 ? 'current' : 'unknown'));
             const gap = fmtGap(b.gap_to_next_seconds);
             const clean = b.clean_shutdown === true ? 'Yes' : b.clean_shutdown === false ? 'No' : '—';
@@ -352,6 +365,26 @@
     m.textContent = "Unreachable";
     document.getElementById("status-sub").textContent = msg;
     document.getElementById("header-sub").textContent = "192.168.1.7";
+  }
+
+  function acknowledgeKernelIssues() {
+    const btn = document.getElementById("dismiss-btn");
+    btn.disabled = true;
+    btn.textContent = "Dismissing…";
+    fetch("/syshealth/api/acknowledge/kernel-issues", { method: "POST" })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) {
+          btn.textContent = "Error";
+          btn.disabled = false;
+        } else {
+          loadStats();
+        }
+      })
+      .catch(() => {
+        btn.textContent = "Error";
+        btn.disabled = false;
+      });
   }
 
   function loadStats() {
